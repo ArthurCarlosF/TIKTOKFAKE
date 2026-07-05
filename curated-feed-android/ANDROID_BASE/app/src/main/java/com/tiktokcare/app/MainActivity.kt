@@ -1,6 +1,7 @@
 package com.tiktokcare.app
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -13,7 +14,6 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -25,7 +25,7 @@ import java.net.URL
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
     private val preferences by lazy { getSharedPreferences("tiktok-care", MODE_PRIVATE) }
 
     private lateinit var root: FrameLayout
@@ -71,7 +71,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        playerView.player = null
+        if (::playerView.isInitialized) {
+            playerView.player = null
+        }
         player?.release()
         player = null
         super.onDestroy()
