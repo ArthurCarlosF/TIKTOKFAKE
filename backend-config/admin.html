@@ -187,7 +187,7 @@
       const endpoint = document.querySelector('#endpoint');
       const token = document.querySelector('#token');
 
-      endpoint.value = localStorage.getItem('tiktokCareEndpoint') || '';
+      endpoint.value = localStorage.getItem('tiktokCareEndpoint') || 'https://script.google.com/macros/s/AKfycbyIx80T2ihZ-XTt9fWpliKmwBqv3DWgXViUaZRfdUUrI0QNxuJvD0wbhOb-SXr0fTdrpw/exec';
       token.value = localStorage.getItem('tiktokCareToken') || '';
 
       form.addEventListener('submit', async event => {

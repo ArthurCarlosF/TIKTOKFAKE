@@ -26,6 +26,12 @@ Para gerar ja apontando para o feed real:
 .\build-apk.bat -GradleArgs '-PTIKTOK_CARE_FEED_URL=https://script.google.com/macros/s/SEU_DEPLOYMENT_ID/exec?action=feed'
 ```
 
+Endpoint atual:
+
+```text
+https://script.google.com/macros/s/AKfycbyIx80T2ihZ-XTt9fWpliKmwBqv3DWgXViUaZRfdUUrI0QNxuJvD0wbhOb-SXr0fTdrpw/exec?action=feed
+```
+
 O script usa, nesta ordem:
 
 1. `JAVA_HOME`, se estiver configurado.
