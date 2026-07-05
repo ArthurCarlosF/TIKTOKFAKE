@@ -1,0 +1,13 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.ARMONI_V21" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#00D4D8</item>
+        <item name="colorSecondary">#FF4267</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="Theme.ARMONI_V21" parent="Base.Theme.ARMONI_V21" />
+</resources>

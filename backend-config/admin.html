@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TikTok Care Admin</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #101114;
+        color: #f4f4f5;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+
+      main {
+        width: min(920px, calc(100vw - 32px));
+        display: grid;
+        gap: 20px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+
+      form {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        padding: 20px;
+        border: 1px solid #2c2d33;
+        border-radius: 8px;
+        background: #18191f;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: #c9cad1;
+      }
+
+      input,
+      textarea,
+      select,
+      button {
+        border: 1px solid #34363f;
+        border-radius: 6px;
+        background: #101114;
+        color: #f4f4f5;
+        font: inherit;
+        padding: 10px 12px;
+      }
+
+      textarea {
+        min-height: 72px;
+        resize: vertical;
+      }
+
+      .wide {
+        grid-column: 1 / -1;
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+      }
+
+      button {
+        cursor: pointer;
+        background: #00b3b8;
+        border-color: #00b3b8;
+        color: #071012;
+        font-weight: 700;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        padding: 16px;
+        border-radius: 8px;
+        background: #18191f;
+        border: 1px solid #2c2d33;
+      }
+
+      @media (max-width: 720px) {
+        form {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>TikTok Care Admin</h1>
+          <p>Gerencie videos aprovados para o feed assistido.</p>
+        </div>
+      </header>
+
+      <form id="video-form">
+        <label>
+          Apps Script URL
+          <input id="endpoint" name="endpoint" required placeholder="https://script.google.com/macros/s/.../exec">
+        </label>
+
+        <label>
+          Token admin
+          <input id="token" name="token" required type="password">
+        </label>
+
+        <label>
+          ID
+          <input name="id" required placeholder="vid-001">
+        </label>
+
+        <label>
+          Titulo
+          <input name="title" required placeholder="Receita simples">
+        </label>
+
+        <label class="wide">
+          URL do video
+          <input name="videoUrl" required placeholder="https://.../video.mp4">
+        </label>
+
+        <label class="wide">
+          URL da thumbnail
+          <input name="thumbnailUrl" placeholder="https://.../thumb.jpg">
+        </label>
+
+        <label>
+          Ativo
+          <select name="active">
+            <option value="true">Sim</option>
+            <option value="false">Nao</option>
+          </select>
+        </label>
+
+        <label>
+          Ordem
+          <input name="order" type="number" value="10">
+        </label>
+
+        <label>
+          Categoria
+          <input name="category" placeholder="culinaria">
+        </label>
+
+        <label>
+          Fonte
+          <input name="sourceLabel" placeholder="Conteudo aprovado">
+        </label>
+
+        <label class="wide">
+          Nota
+          <textarea name="caregiverNote" placeholder="Observacao para cuidador ou equipe"></textarea>
+        </label>
+
+        <div class="wide actions">
+          <button type="submit">Salvar video</button>
+        </div>
+      </form>
+
+      <pre id="result">Pronto.</pre>
+    </main>
+
+    <script>
+      const form = document.querySelector('#video-form');
+      const result = document.querySelector('#result');
+      const endpoint = document.querySelector('#endpoint');
+      const token = document.querySelector('#token');
+
+      endpoint.value = localStorage.getItem('tiktokCareEndpoint') || '';
+      token.value = localStorage.getItem('tiktokCareToken') || '';
+
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+
+        const data = new FormData(form);
+        const url = String(data.get('endpoint') || '').trim();
+        const adminToken = String(data.get('token') || '');
+
+        localStorage.setItem('tiktokCareEndpoint', url);
+        localStorage.setItem('tiktokCareToken', adminToken);
+
+        const video = {
+          id: data.get('id'),
+          title: data.get('title'),
+          videoUrl: data.get('videoUrl'),
+          thumbnailUrl: data.get('thumbnailUrl'),
+          active: data.get('active') === 'true',
+          category: data.get('category'),
+          sourceLabel: data.get('sourceLabel'),
+          caregiverNote: data.get('caregiverNote'),
+          order: Number(data.get('order') || 0)
+        };
+
+        result.textContent = 'Salvando...';
+
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify({
+              action: 'upsertVideo',
+              token: adminToken,
+              video
+            })
+          });
+
+          const payload = await response.json();
+          result.textContent = JSON.stringify(payload, null, 2);
+        } catch (error) {
+          result.textContent = String(error);
+        }
+      });
+    </script>
+  </body>
+</html>

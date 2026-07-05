@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-05T10:00:00-03:00",
+  "videos": [
+    {
+      "id": "vid-001",
+      "title": "Receita simples",
+      "videoUrl": "https://example.com/videos/receita.mp4",
+      "thumbnailUrl": "https://example.com/thumbs/receita.jpg",
+      "active": true,
+      "category": "culinaria",
+      "sourceLabel": "Conteudo aprovado",
+      "caregiverNote": "Validado para o feed inicial",
+      "order": 10,
+      "updatedAt": "2026-07-05T10:00:00-03:00"
+    }
+  ]
+}
