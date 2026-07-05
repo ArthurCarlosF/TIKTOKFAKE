@@ -6,6 +6,7 @@
       "id": "vid-001",
       "title": "Receita simples",
       "videoUrl": "https://example.com/videos/receita.mp4",
+      "youtubeId": "",
       "thumbnailUrl": "https://example.com/thumbs/receita.jpg",
       "active": true,
       "category": "culinaria",

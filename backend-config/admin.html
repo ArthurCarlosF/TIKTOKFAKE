@@ -136,8 +136,13 @@
         </label>
 
         <label class="wide">
-          URL do video
-          <input name="videoUrl" required placeholder="https://.../video.mp4">
+          URL do video ou YouTube
+          <input name="videoUrl" placeholder="https://.../video.mp4 ou https://www.youtube.com/watch?v=...">
+        </label>
+
+        <label class="wide">
+          YouTube ID
+          <input name="youtubeId" placeholder="Opcional: 11 caracteres do video">
         </label>
 
         <label class="wide">
@@ -204,6 +209,7 @@
           id: data.get('id'),
           title: data.get('title'),
           videoUrl: data.get('videoUrl'),
+          youtubeId: data.get('youtubeId'),
           thumbnailUrl: data.get('thumbnailUrl'),
           active: data.get('active') === 'true',
           category: data.get('category'),

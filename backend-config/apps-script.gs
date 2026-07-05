@@ -68,6 +68,7 @@ function upsertVideo(video) {
     id,
     title: video.title,
     videoUrl: video.videoUrl,
+    youtubeId: video.youtubeId,
     thumbnailUrl: video.thumbnailUrl,
     active: video.active,
     category: video.category,
@@ -119,6 +120,7 @@ function ensureHeaders(sheet) {
     'id',
     'title',
     'videoUrl',
+    'youtubeId',
     'thumbnailUrl',
     'active',
     'category',
@@ -133,7 +135,16 @@ function ensureHeaders(sheet) {
 
   if (!hasHeaders) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return;
   }
+
+  const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  headers.forEach(header => {
+    if (!existing.includes(header)) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      existing.push(header);
+    }
+  });
 }
 
 function rowToObject(headers, row) {
@@ -148,6 +159,7 @@ function normalizeVideo(video) {
     id: String(video.id || '').trim(),
     title: String(video.title || '').trim(),
     videoUrl: String(video.videoUrl || '').trim(),
+    youtubeId: normalizeYoutubeId(video.youtubeId || video.videoUrl),
     thumbnailUrl: String(video.thumbnailUrl || '').trim(),
     active: normalizeBoolean(video.active),
     category: String(video.category || '').trim(),
@@ -156,6 +168,25 @@ function normalizeVideo(video) {
     order: Number(video.order || 0),
     updatedAt: String(video.updatedAt || '').trim()
   };
+}
+
+function normalizeYoutubeId(value) {
+  const text = String(value || '').trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(text)) return text;
+
+  const patterns = [
+    /youtube\.com\/watch\?v=([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/,
+    /youtu\.be\/([A-Za-z0-9_-]{11})/
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1];
+  }
+
+  return '';
 }
 
 function normalizeBoolean(value) {

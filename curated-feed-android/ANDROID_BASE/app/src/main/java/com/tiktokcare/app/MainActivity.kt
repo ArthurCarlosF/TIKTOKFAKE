@@ -8,6 +8,9 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -28,6 +31,7 @@ class MainActivity : Activity() {
 
     private lateinit var root: FrameLayout
     private lateinit var playerView: PlayerView
+    private lateinit var youtubeView: WebView
     private lateinit var loading: ProgressBar
     private lateinit var brandText: TextView
     private lateinit var titleText: TextView
@@ -61,16 +65,21 @@ class MainActivity : Activity() {
         super.onResume()
         hideSystemUi()
         player?.play()
+        if (::youtubeView.isInitialized) youtubeView.onResume()
     }
 
     override fun onPause() {
         player?.pause()
+        if (::youtubeView.isInitialized) youtubeView.onPause()
         super.onPause()
     }
 
     override fun onDestroy() {
         if (::playerView.isInitialized) {
             playerView.player = null
+        }
+        if (::youtubeView.isInitialized) {
+            youtubeView.destroy()
         }
         player?.release()
         player = null
@@ -99,6 +108,18 @@ class MainActivity : Activity() {
             layoutParams = FrameLayout.LayoutParams(match(), match())
         }
         root.addView(playerView)
+
+        youtubeView = WebView(this).apply {
+            setBackgroundColor(Color.BLACK)
+            visibility = View.GONE
+            webChromeClient = WebChromeClient()
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
+            layoutParams = FrameLayout.LayoutParams(match(), match())
+        }
+        root.addView(youtubeView)
 
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -189,6 +210,7 @@ class MainActivity : Activity() {
         likeButton.setOnClickListener { likeButton.isSelected = !likeButton.isSelected }
 
         root.setOnClickListener {
+            if (::youtubeView.isInitialized && youtubeView.visibility == View.VISIBLE) return@setOnClickListener
             val current = player ?: return@setOnClickListener
             if (current.isPlaying) current.pause() else current.play()
         }
@@ -277,13 +299,17 @@ class MainActivity : Activity() {
             val item = array.getJSONObject(index)
             if (!item.optBoolean("active", true)) continue
 
-            val videoUrl = item.optString("videoUrl").trim()
-            if (videoUrl.isEmpty()) continue
+            val rawVideoUrl = item.optString("videoUrl").trim()
+            val rawYoutubeId = item.optString("youtubeId").trim()
+            val youtubeId = rawYoutubeId.ifBlank { extractYoutubeId(rawVideoUrl).orEmpty() }
+            val videoUrl = if (youtubeId.isBlank()) rawVideoUrl else ""
+            if (videoUrl.isEmpty() && youtubeId.isEmpty()) continue
 
             items += CareVideo(
                 id = item.optString("id").ifBlank { "video-$index" },
                 title = item.optString("title").ifBlank { "Video aprovado" },
                 videoUrl = videoUrl,
+                youtubeId = youtubeId,
                 category = item.optString("category"),
                 sourceLabel = item.optString("sourceLabel").ifBlank { "TikTok Care" },
                 caregiverNote = item.optString("caregiverNote"),
@@ -300,6 +326,7 @@ class MainActivity : Activity() {
         statusText.visibility = View.GONE
         retryButton.visibility = View.GONE
         playerView.visibility = View.VISIBLE
+        youtubeView.visibility = View.GONE
         likeButton.isSelected = false
         likeButton.text = "♥"
 
@@ -307,6 +334,20 @@ class MainActivity : Activity() {
         metaText.text = listOf(video.sourceLabel, video.category, video.caregiverNote)
             .filter { it.isNotBlank() }
             .joinToString(" • ")
+
+        if (video.youtubeId.isNotBlank()) {
+            playerView.visibility = View.GONE
+            youtubeView.visibility = View.VISIBLE
+            player?.stop()
+            youtubeView.loadDataWithBaseURL(
+                "https://www.youtube.com",
+                youtubeHtml(video.youtubeId),
+                "text/html",
+                "UTF-8",
+                null
+            )
+            return
+        }
 
         val currentPlayer = player ?: run {
             showMessage(getString(R.string.feed_error), true)
@@ -342,6 +383,7 @@ class MainActivity : Activity() {
     private fun showMessage(message: String, canRetry: Boolean) {
         loading.visibility = View.GONE
         playerView.visibility = View.GONE
+        youtubeView.visibility = View.GONE
         statusText.text = message
         statusText.visibility = View.VISIBLE
         retryButton.visibility = if (canRetry) View.VISIBLE else View.GONE
@@ -377,6 +419,54 @@ class MainActivity : Activity() {
         setContentView(fallback)
     }
 
+    private fun extractYoutubeId(value: String): String? {
+        if (value.isBlank()) return null
+        val trimmed = value.trim()
+        if (trimmed.matches(Regex("^[A-Za-z0-9_-]{11}$"))) return trimmed
+
+        return runCatching {
+            val uri = Uri.parse(trimmed)
+            when {
+                uri.host.orEmpty().contains("youtu.be") -> uri.lastPathSegment
+                uri.host.orEmpty().contains("youtube.com") && uri.path.orEmpty().startsWith("/shorts/") ->
+                    uri.pathSegments.getOrNull(1)
+                uri.host.orEmpty().contains("youtube.com") && uri.path.orEmpty().startsWith("/embed/") ->
+                    uri.pathSegments.getOrNull(1)
+                uri.host.orEmpty().contains("youtube.com") -> uri.getQueryParameter("v")
+                else -> null
+            }?.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{11}$")) }
+        }.getOrNull()
+    }
+
+    private fun youtubeHtml(youtubeId: String): String {
+        return """
+            <!doctype html>
+            <html>
+              <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                  html, body, iframe {
+                    width: 100%;
+                    height: 100%;
+                    margin: 0;
+                    padding: 0;
+                    overflow: hidden;
+                    background: #000;
+                  }
+                </style>
+              </head>
+              <body>
+                <iframe
+                  src="https://www.youtube.com/embed/$youtubeId?autoplay=1&playsinline=1&rel=0&modestbranding=1"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen>
+                </iframe>
+              </body>
+            </html>
+        """.trimIndent()
+    }
+
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
     private fun match(): Int = FrameLayout.LayoutParams.MATCH_PARENT
     private fun wrap(): Int = FrameLayout.LayoutParams.WRAP_CONTENT
@@ -385,6 +475,7 @@ class MainActivity : Activity() {
         val id: String,
         val title: String,
         val videoUrl: String,
+        val youtubeId: String,
         val category: String,
         val sourceLabel: String,
         val caregiverNote: String,

@@ -27,7 +27,8 @@ TikTok Care is a curated vertical-video app for assisted use. It keeps the inter
 | --- | --- | --- | --- |
 | id | yes | `vid-001` | Stable unique ID. |
 | title | yes | `Receita de bolo simples` | User-facing title. |
-| videoUrl | yes | `https://example.com/video.mp4` | Direct playable URL preferred. |
+| videoUrl | no | `https://example.com/video.mp4` | Direct playable URL or YouTube URL. Required only when `youtubeId` is empty. |
+| youtubeId | no | `dQw4w9WgXcQ` | YouTube video ID. Required only when `videoUrl` is empty. |
 | thumbnailUrl | no | `https://example.com/thumb.jpg` | Used while loading. |
 | active | yes | `TRUE` | Only active rows appear in the app. |
 | category | no | `culinaria` | Filter/group metadata. |
@@ -47,6 +48,7 @@ TikTok Care is a curated vertical-video app for assisted use. It keeps the inter
       "id": "vid-001",
       "title": "Receita de bolo simples",
       "videoUrl": "https://example.com/video.mp4",
+      "youtubeId": "",
       "thumbnailUrl": "https://example.com/thumb.jpg",
       "active": true,
       "category": "culinaria",
