@@ -8,8 +8,6 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -48,15 +46,15 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        hideSystemUi()
-        buildLayout()
-        setContentView(root)
-        player = ExoPlayer.Builder(this).build().also {
-            it.repeatMode = Player.REPEAT_MODE_ONE
-            it.playWhenReady = true
-            playerView.player = it
+        runCatching {
+            buildLayout()
+            setContentView(root)
+            hideSystemUi()
+            createPlayer()
+            loadFeed()
+        }.onFailure { error ->
+            showStartupFallback(error)
         }
-        loadFeed()
     }
 
     override fun onResume() {
@@ -77,6 +75,14 @@ class MainActivity : Activity() {
         player?.release()
         player = null
         super.onDestroy()
+    }
+
+    private fun createPlayer() {
+        player = ExoPlayer.Builder(this).build().also {
+            it.repeatMode = Player.REPEAT_MODE_ONE
+            it.playWhenReady = true
+            playerView.player = it
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -302,7 +308,12 @@ class MainActivity : Activity() {
             .filter { it.isNotBlank() }
             .joinToString(" • ")
 
-        player?.apply {
+        val currentPlayer = player ?: run {
+            showMessage(getString(R.string.feed_error), true)
+            return
+        }
+
+        currentPlayer.apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(video.videoUrl)))
             prepare()
             playWhenReady = true
@@ -339,22 +350,31 @@ class MainActivity : Activity() {
     private fun hideSystemUi() {
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                )
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
+    }
+
+    private fun showStartupFallback(error: Throwable) {
+        val fallback = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
         }
+        val message = TextView(this).apply {
+            text = "TikTok Care\n\nNao foi possivel iniciar.\n${error.javaClass.simpleName}"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setPadding(32, 32, 32, 32)
+            layoutParams = FrameLayout.LayoutParams(match(), wrap(), Gravity.CENTER)
+        }
+        fallback.addView(message)
+        setContentView(fallback)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
