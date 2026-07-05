@@ -4,7 +4,7 @@ Projeto Android nativo com feed vertical curado e painel estatico para GitHub Pa
 
 ## GitHub Pages
 
-Publique a pasta `pages` pelo GitHub Pages.
+Publique pela raiz do repositorio.
 
 URL esperada:
 
