@@ -6,6 +6,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -46,12 +47,23 @@ class MainActivity : Activity() {
     private lateinit var retryButton: TextView
     private lateinit var importButton: TextView
     private lateinit var likeButton: TextView
+    private lateinit var likeCountText: TextView
+    private lateinit var commentButton: TextView
+    private lateinit var commentCountText: TextView
+    private lateinit var favoriteButton: TextView
+    private lateinit var favoriteCountText: TextView
+    private lateinit var shareButton: TextView
+    private lateinit var shareCountText: TextView
+    private lateinit var profileButton: TextView
+    private lateinit var followButton: TextView
+    private lateinit var discButton: TextView
     private lateinit var nextButton: TextView
     private lateinit var previousButton: TextView
 
     private var player: ExoPlayer? = null
     private var videos: List<CareVideo> = emptyList()
     private var playQueue: List<CareVideo> = emptyList()
+    private var likedVideoIds = mutableSetOf<String>()
     private var currentIndex = 0
     private var gestureStartY = 0f
     private var gestureStartX = 0f
@@ -63,6 +75,7 @@ class MainActivity : Activity() {
             setContentView(root)
             hideSystemUi()
             createPlayer()
+            likedVideoIds = preferences.getStringSet(PREF_LIKED_IDS, emptySet()).orEmpty().toMutableSet()
             loadLocalVideosOrFeed()
         }.onFailure { error ->
             showStartupFallback(error)
@@ -137,17 +150,20 @@ class MainActivity : Activity() {
         }
 
         brandText = TextView(this).apply {
-            text = "TikTok Care"
+            text = "Live   Seguindo   Para voce   Buscar"
             setTextColor(Color.WHITE)
-            textSize = 19f
+            textSize = 18f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(match(), wrap())
+            setShadowLayer(8f, 0f, 2f, Color.argb(180, 0, 0, 0))
         }
         topBar.addView(brandText)
         root.addView(topBar)
 
         val bottomInfo = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(16), dp(96), dp(28))
+            setPadding(dp(18), dp(16), dp(98), dp(84))
             layoutParams = FrameLayout.LayoutParams(match(), wrap(), Gravity.BOTTOM)
             setBackgroundColor(Color.TRANSPARENT)
         }
@@ -171,16 +187,53 @@ class MainActivity : Activity() {
         val actions = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(0, 0, dp(12), dp(94))
+            setPadding(0, 0, dp(10), dp(88))
             layoutParams = FrameLayout.LayoutParams(wrap(), wrap(), Gravity.BOTTOM or Gravity.END)
         }
-        likeButton = actionButton("♥")
-        previousButton = actionButton("↑")
-        nextButton = actionButton("↓")
+        profileButton = profileCircle("TC")
+        followButton = followBadge()
+        likeButton = actionIconButton("♥")
+        likeCountText = actionCount("0")
+        commentButton = actionIconButton("●")
+        commentCountText = actionCount("0")
+        favoriteButton = actionIconButton("■")
+        favoriteCountText = actionCount("0")
+        shareButton = actionIconButton("↗")
+        shareCountText = actionCount("0")
+        discButton = profileCircle("♪")
+        previousButton = actionIconButton("↑")
+        nextButton = actionIconButton("↓")
+        actions.addView(profileButton)
+        actions.addView(followButton)
         actions.addView(likeButton)
-        actions.addView(previousButton)
-        actions.addView(nextButton)
+        actions.addView(likeCountText)
+        actions.addView(commentButton)
+        actions.addView(commentCountText)
+        actions.addView(favoriteButton)
+        actions.addView(favoriteCountText)
+        actions.addView(shareButton)
+        actions.addView(shareCountText)
+        actions.addView(discButton)
         root.addView(actions)
+
+        val bottomNav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setBackgroundColor(Color.argb(210, 0, 0, 0))
+            layoutParams = FrameLayout.LayoutParams(match(), dp(64), Gravity.BOTTOM)
+        }
+        listOf("Inicio", "Amigos", "+", "Mensagens", "Perfil").forEach { label ->
+            bottomNav.addView(TextView(this).apply {
+                text = label
+                setTextColor(Color.WHITE)
+                textSize = if (label == "+") 30f else 12f
+                gravity = Gravity.CENTER
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, match(), 1f)
+            })
+        }
+        root.addView(bottomNav)
 
         loading = ProgressBar(this).apply {
             layoutParams = FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER)
@@ -231,7 +284,7 @@ class MainActivity : Activity() {
 
         nextButton.setOnClickListener { showNext() }
         previousButton.setOnClickListener { showPrevious() }
-        likeButton.setOnClickListener { likeButton.isSelected = !likeButton.isSelected }
+        likeButton.setOnClickListener { toggleLike() }
 
         root.setOnClickListener {
             if (::youtubeView.isInitialized && youtubeView.visibility == View.VISIBLE) return@setOnClickListener
@@ -272,6 +325,69 @@ class MainActivity : Activity() {
                 topMargin = dp(10)
             }
             setShadowLayer(8f, 0f, 2f, Color.argb(180, 0, 0, 0))
+        }
+    }
+
+    private fun actionIconButton(label: String): TextView {
+        return TextView(this).apply {
+            text = label
+            setTextColor(Color.WHITE)
+            textSize = 32f
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(dp(58), dp(44)).apply {
+                topMargin = dp(8)
+            }
+            setShadowLayer(8f, 0f, 2f, Color.argb(190, 0, 0, 0))
+        }
+    }
+
+    private fun actionCount(value: String): TextView {
+        return TextView(this).apply {
+            text = value
+            setTextColor(Color.WHITE)
+            textSize = 12f
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(dp(58), dp(18))
+            setShadowLayer(6f, 0f, 2f, Color.argb(180, 0, 0, 0))
+        }
+    }
+
+    private fun profileCircle(label: String): TextView {
+        return TextView(this).apply {
+            text = label
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            background = circleBackground(Color.argb(230, 32, 42, 58), Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(dp(54), dp(54)).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(2)
+            }
+        }
+    }
+
+    private fun followBadge(): TextView {
+        return TextView(this).apply {
+            text = "+"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            background = circleBackground(Color.rgb(255, 47, 87), Color.rgb(255, 47, 87))
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                bottomMargin = dp(8)
+            }
+        }
+    }
+
+    private fun circleBackground(fillColor: Int, strokeColor: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(fillColor)
+            setStroke(dp(2), strokeColor)
         }
     }
 
@@ -531,11 +647,10 @@ class MainActivity : Activity() {
         retryButton.visibility = View.GONE
         playerView.visibility = View.VISIBLE
         youtubeView.visibility = View.GONE
-        likeButton.isSelected = false
-        likeButton.text = "♥"
+        updateActionState(video)
 
-        titleText.text = video.title
-        metaText.text = listOf(video.sourceLabel, video.category, video.caregiverNote)
+        titleText.text = video.sourceLabel.ifBlank { "TikTok Care" }
+        metaText.text = listOf(video.title, video.category, video.caregiverNote)
             .filter { it.isNotBlank() }
             .joinToString(" • ")
 
@@ -563,6 +678,47 @@ class MainActivity : Activity() {
             prepare()
             playWhenReady = true
         }
+    }
+
+    private fun toggleLike() {
+        val video = playQueue.getOrNull(currentIndex) ?: return
+        if (likedVideoIds.contains(video.id)) {
+            likedVideoIds.remove(video.id)
+        } else {
+            likedVideoIds.add(video.id)
+        }
+        preferences.edit().putStringSet(PREF_LIKED_IDS, likedVideoIds).apply()
+        updateActionState(video)
+    }
+
+    private fun updateActionState(video: CareVideo) {
+        val liked = likedVideoIds.contains(video.id)
+        likeButton.text = "♥"
+        likeButton.setTextColor(if (liked) Color.rgb(255, 47, 87) else Color.WHITE)
+        likeCountText.text = formatCount(baseCount(video.id, 3200, 82000) + if (liked) 1 else 0)
+        commentCountText.text = formatCount(baseCount("${video.id}-comments", 80, 7600))
+        favoriteCountText.text = formatCount(baseCount("${video.id}-favorites", 40, 3200))
+        shareCountText.text = formatCount(baseCount("${video.id}-shares", 20, 1800))
+        profileButton.text = initials(video.sourceLabel.ifBlank { "TC" })
+    }
+
+    private fun baseCount(seed: String, min: Int, max: Int): Int {
+        val range = (max - min).coerceAtLeast(1)
+        return min + (abs(seed.hashCode()) % range)
+    }
+
+    private fun formatCount(value: Int): String {
+        return if (value >= 1000) {
+            val rounded = value / 100.0
+            String.format(java.util.Locale.US, "%.1f mil", rounded / 10.0)
+        } else {
+            value.toString()
+        }
+    }
+
+    private fun initials(value: String): String {
+        val words = value.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        return words.take(2).joinToString("") { it.first().uppercase() }.ifBlank { "TC" }
     }
 
     private fun showNext() {
@@ -702,6 +858,7 @@ class MainActivity : Activity() {
 
     companion object {
         private const val CACHE_KEY_FEED_JSON = "feed_json"
+        private const val PREF_LIKED_IDS = "liked_video_ids"
         private const val REQUEST_VIDEO_PERMISSION = 101
         private const val REQUEST_IMPORT_VIDEOS = 102
         private val VIDEO_EXTENSIONS = setOf("mp4", "mov", "m4v", "webm", "mkv")
