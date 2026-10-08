@@ -44,3 +44,14 @@ Endpoint atual:
 ```text
 https://script.google.com/macros/s/AKfycbyIx80T2ihZ-XTt9fWpliKmwBqv3DWgXViUaZRfdUUrI0QNxuJvD0wbhOb-SXr0fTdrpw/exec?action=feed
 ```
+
+## Videos locais no celular
+
+O app procura primeiro por videos salvos no proprio aparelho nestas pastas:
+
+```text
+Movies/TikTokCare
+Download/TikTokCare
+```
+
+Se encontrar arquivos de video nessas pastas, ele monta o feed local. Se nao encontrar, tenta carregar o feed remoto.

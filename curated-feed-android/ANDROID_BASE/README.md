@@ -12,6 +12,17 @@ Passe a URL publicada do Apps Script ou de um JSON no GitHub Pages pela propried
 
 O app guarda em cache o ultimo JSON valido. Se a internet falhar, ele tenta usar esse cache.
 
+## Videos locais
+
+Antes de buscar o feed remoto, o app procura videos nestas pastas publicas do celular:
+
+```text
+Movies/TikTokCare
+Download/TikTokCare
+```
+
+Na primeira abertura, o Android pode pedir permissao para acessar videos. Os familiares podem copiar arquivos `.mp4` para uma dessas pastas usando cabo USB ou um gerenciador de arquivos.
+
 ## Gerar APK no Windows
 
 Use o script portavel:

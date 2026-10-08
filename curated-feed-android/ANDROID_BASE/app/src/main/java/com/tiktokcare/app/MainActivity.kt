@@ -1,10 +1,14 @@
 package com.tiktokcare.app
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -55,7 +59,7 @@ class MainActivity : Activity() {
             setContentView(root)
             hideSystemUi()
             createPlayer()
-            loadFeed()
+            loadLocalVideosOrFeed()
         }.onFailure { error ->
             showStartupFallback(error)
         }
@@ -201,7 +205,7 @@ class MainActivity : Activity() {
             layoutParams = FrameLayout.LayoutParams(wrap(), wrap(), Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply {
                 bottomMargin = dp(74)
             }
-            setOnClickListener { loadFeed() }
+            setOnClickListener { loadLocalVideosOrFeed() }
         }
         root.addView(retryButton)
 
@@ -274,6 +278,106 @@ class MainActivity : Activity() {
                     }
             }
         }
+    }
+
+    private fun loadLocalVideosOrFeed() {
+        showLoading()
+        if (!hasVideoPermission()) {
+            requestPermissions(arrayOf(videoPermission()), REQUEST_VIDEO_PERMISSION)
+            return
+        }
+
+        thread(name = "local-feed-loader") {
+            val localVideos = runCatching { queryLocalVideos() }.getOrDefault(emptyList())
+            runOnUiThread {
+                if (localVideos.isNotEmpty()) {
+                    videos = localVideos
+                    currentIndex = 0
+                    playCurrent()
+                } else {
+                    loadFeed()
+                }
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_VIDEO_PERMISSION) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                loadLocalVideosOrFeed()
+            } else {
+                loadFeed()
+            }
+        }
+    }
+
+    private fun hasVideoPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            true
+        } else {
+            checkSelfPermission(videoPermission()) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun videoPermission(): String {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_VIDEO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+    }
+
+    private fun queryLocalVideos(): List<CareVideo> {
+        val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(
+            MediaStore.Video.Media._ID,
+            MediaStore.Video.Media.DISPLAY_NAME,
+            MediaStore.Video.Media.DATE_ADDED
+        )
+
+        val selection: String
+        val selectionArgs: Array<String>
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            selection = "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ? OR ${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?"
+            selectionArgs = arrayOf("%Movies/TikTokCare%", "%Download/TikTokCare%")
+        } else {
+            @Suppress("DEPRECATION")
+            selection = "${MediaStore.Video.Media.DATA} LIKE ? OR ${MediaStore.Video.Media.DATA} LIKE ?"
+            selectionArgs = arrayOf("%/Movies/TikTokCare/%", "%/Download/TikTokCare/%")
+        }
+
+        val sort = "${MediaStore.Video.Media.DATE_ADDED} DESC"
+        val items = mutableListOf<CareVideo>()
+
+        contentResolver.query(collection, projection, selection, selectionArgs, sort)?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val name = cursor.getString(nameColumn).orEmpty()
+                val uri = Uri.withAppendedPath(collection, id.toString()).toString()
+
+                items += CareVideo(
+                    id = "local-$id",
+                    title = name.substringBeforeLast('.').ifBlank { "Video local" },
+                    videoUrl = uri,
+                    youtubeId = "",
+                    category = "Local",
+                    sourceLabel = "Videos do celular",
+                    caregiverNote = "",
+                    order = items.size
+                )
+            }
+        }
+
+        return items
     }
 
     private fun fetchFeedJson(feedUrl: String): String {
@@ -484,5 +588,6 @@ class MainActivity : Activity() {
 
     companion object {
         private const val CACHE_KEY_FEED_JSON = "feed_json"
+        private const val REQUEST_VIDEO_PERMISSION = 101
     }
 }

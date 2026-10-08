@@ -2,5 +2,6 @@
     <string name="app_name">TikTok Care</string>
     <string name="feed_empty">Nenhum video ativo no feed.</string>
     <string name="feed_error">Nao foi possivel carregar o feed.</string>
+    <string name="local_feed_empty">Coloque videos em Movies/TikTokCare ou Download/TikTokCare.</string>
     <string name="retry">Tentar novamente</string>
 </resources>
