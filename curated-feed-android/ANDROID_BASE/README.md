@@ -23,7 +23,7 @@ Download/TikTokCare
 
 Na primeira abertura, o Android pode pedir permissao para acessar videos. Os familiares podem copiar arquivos `.mp4` para uma dessas pastas usando cabo USB ou um gerenciador de arquivos.
 
-O app tambem mostra um botao `Importar`, que abre a galeria/seletor de arquivos do Android. Os videos escolhidos sao copiados para o armazenamento interno do app e passam a aparecer no feed.
+O app tambem mostra um botao `Importar`, que abre a galeria/seletor de arquivos do Android. Os videos escolhidos sao copiados para o armazenamento interno do app e passam a aparecer no feed. O mesmo fluxo aceita `.zip` com varios videos; arquivos nao compativeis dentro do pacote sao ignorados.
 
 ## Gerar APK no Windows
 

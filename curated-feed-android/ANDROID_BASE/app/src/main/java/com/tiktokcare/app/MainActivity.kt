@@ -30,6 +30,7 @@ import java.io.BufferedReader
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.zip.ZipInputStream
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
@@ -438,7 +439,8 @@ class MainActivity : Activity() {
     private fun openVideoImporter() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "video/*"
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("video/*", "application/zip", "application/x-zip-compressed"))
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
@@ -462,8 +464,8 @@ class MainActivity : Activity() {
 
         showLoading()
         thread(name = "video-importer") {
-            val imported = uris.mapNotNull { uri ->
-                runCatching { copyImportedVideo(uri) }.getOrNull()
+            val imported = uris.flatMap { uri ->
+                runCatching { importVideoOrZip(uri) }.getOrDefault(emptyList())
             }
             runOnUiThread {
                 if (imported.isNotEmpty()) {
@@ -579,10 +581,23 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun copyImportedVideo(uri: Uri): File {
+    private fun importVideoOrZip(uri: Uri): List<File> {
+        val displayName = displayName(uri)
+        val mimeType = contentResolver.getType(uri).orEmpty()
+        return if (mimeType.contains("zip", ignoreCase = true) || displayName.endsWith(".zip", ignoreCase = true)) {
+            extractZipVideos(uri)
+        } else {
+            listOf(copyImportedVideo(uri, displayName))
+        }
+    }
+
+    private fun copyImportedVideo(uri: Uri, displayName: String = displayName(uri)): File {
         val directory = importedVideoDirectory().apply { mkdirs() }
-        val extension = contentResolver.getType(uri)?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "mp4"
-        val file = File(directory, "video-${System.currentTimeMillis()}-${uri.hashCode()}.$extension")
+        val extension = videoExtension(displayName)
+            ?: contentResolver.getType(uri)?.substringAfterLast('/')?.takeIf { it.isNotBlank() && it != "mp4v-es" }
+            ?: "mp4"
+        val baseName = safeBaseName(displayName.substringBeforeLast('.', "video"))
+        val file = File(directory, uniqueFileName("$baseName.$extension"))
 
         contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "Unable to open imported video" }
@@ -590,6 +605,73 @@ class MainActivity : Activity() {
         }
 
         return file
+    }
+
+    private fun extractZipVideos(uri: Uri): List<File> {
+        val directory = importedVideoDirectory().apply { mkdirs() }
+        val imported = mutableListOf<File>()
+
+        contentResolver.openInputStream(uri).use { rawInput ->
+            requireNotNull(rawInput) { "Unable to open zip" }
+            ZipInputStream(rawInput.buffered()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name.substringAfterLast('/').substringAfterLast('\\')
+                    val extension = videoExtension(name)
+
+                    if (!entry.isDirectory && extension != null) {
+                        val baseName = safeBaseName(name.substringBeforeLast('.', "video"))
+                        val target = File(directory, uniqueFileName("$baseName.$extension"))
+                        target.outputStream().use { output -> zip.copyTo(output) }
+                        imported += target
+                    }
+
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        }
+
+        return imported
+    }
+
+    private fun displayName(uri: Uri): String {
+        val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
+        contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                if (index >= 0) return cursor.getString(index).orEmpty()
+            }
+        }
+        return uri.lastPathSegment.orEmpty().substringAfterLast('/')
+    }
+
+    private fun videoExtension(name: String): String? {
+        val extension = name.substringAfterLast('.', "").lowercase()
+        return extension.takeIf { it in VIDEO_EXTENSIONS }
+    }
+
+    private fun safeBaseName(value: String): String {
+        return value
+            .replace(Regex("[^A-Za-z0-9._-]+"), "-")
+            .trim('-', '.', '_')
+            .take(48)
+            .ifBlank { "video" }
+    }
+
+    private fun uniqueFileName(preferredName: String): String {
+        val directory = importedVideoDirectory()
+        val base = preferredName.substringBeforeLast('.', "video")
+        val extension = preferredName.substringAfterLast('.', "mp4")
+        var candidate = "$base.$extension"
+        var index = 1
+
+        while (File(directory, candidate).exists()) {
+            candidate = "$base-$index.$extension"
+            index += 1
+        }
+
+        return candidate
     }
 
     private fun importedVideoDirectory(): File {
@@ -861,6 +943,6 @@ class MainActivity : Activity() {
         private const val PREF_LIKED_IDS = "liked_video_ids"
         private const val REQUEST_VIDEO_PERMISSION = 101
         private const val REQUEST_IMPORT_VIDEOS = 102
-        private val VIDEO_EXTENSIONS = setOf("mp4", "mov", "m4v", "webm", "mkv")
+        private val VIDEO_EXTENSIONS = setOf("mp4", "mov", "m4v", "webm", "mkv", "3gp")
     }
 }
