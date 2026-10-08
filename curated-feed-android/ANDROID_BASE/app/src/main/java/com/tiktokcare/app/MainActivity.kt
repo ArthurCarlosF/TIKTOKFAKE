@@ -51,6 +51,7 @@ class MainActivity : Activity() {
 
     private var player: ExoPlayer? = null
     private var videos: List<CareVideo> = emptyList()
+    private var playQueue: List<CareVideo> = emptyList()
     private var currentIndex = 0
     private var gestureStartY = 0f
     private var gestureStartX = 0f
@@ -288,8 +289,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 result
                     .onSuccess { loaded ->
-                        videos = loaded
-                        currentIndex = 0
+                        setVideos(loaded)
                         if (videos.isEmpty()) showMessage(getString(R.string.feed_empty), false) else playCurrent()
                     }
                     .onFailure {
@@ -310,8 +310,7 @@ class MainActivity : Activity() {
             val localVideos = runCatching { queryLocalVideos() }.getOrDefault(emptyList())
             runOnUiThread {
                 if (localVideos.isNotEmpty()) {
-                    videos = localVideos
-                    currentIndex = 0
+                    setVideos(localVideos)
                     playCurrent()
                 } else {
                     showMessage(getString(R.string.local_feed_empty), true)
@@ -352,8 +351,7 @@ class MainActivity : Activity() {
             }
             runOnUiThread {
                 if (imported.isNotEmpty()) {
-                    videos = queryImportedVideos()
-                    currentIndex = 0
+                    setVideos(queryImportedVideos())
                     playCurrent()
                 } else {
                     showMessage(getString(R.string.import_failed), true)
@@ -527,7 +525,7 @@ class MainActivity : Activity() {
     }
 
     private fun playCurrent() {
-        val video = videos.getOrNull(currentIndex) ?: return
+        val video = playQueue.getOrNull(currentIndex) ?: return
         loading.visibility = View.GONE
         statusText.visibility = View.GONE
         retryButton.visibility = View.GONE
@@ -569,14 +567,28 @@ class MainActivity : Activity() {
 
     private fun showNext() {
         if (videos.isEmpty()) return
-        currentIndex = (currentIndex + 1) % videos.size
+        currentIndex += 1
+        if (currentIndex >= playQueue.size) {
+            reshuffleQueue()
+            currentIndex = 0
+        }
         playCurrent()
     }
 
     private fun showPrevious() {
         if (videos.isEmpty()) return
-        currentIndex = if (currentIndex == 0) videos.lastIndex else currentIndex - 1
+        currentIndex = if (currentIndex == 0) playQueue.lastIndex else currentIndex - 1
         playCurrent()
+    }
+
+    private fun setVideos(newVideos: List<CareVideo>) {
+        videos = newVideos
+        reshuffleQueue()
+        currentIndex = 0
+    }
+
+    private fun reshuffleQueue() {
+        playQueue = if (videos.size <= 1) videos else videos.shuffled()
     }
 
     private fun showLoading() {
