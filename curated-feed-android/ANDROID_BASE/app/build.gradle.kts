@@ -13,6 +13,17 @@ android {
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
 
+    val releaseStoreFile = providers.gradleProperty("TIKTOK_CARE_STORE_FILE").orNull
+    val releaseStorePassword = providers.gradleProperty("TIKTOK_CARE_STORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.gradleProperty("TIKTOK_CARE_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.gradleProperty("TIKTOK_CARE_KEY_PASSWORD").orNull
+    val hasReleaseSigning = listOf(
+        releaseStoreFile,
+        releaseStorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword
+    ).all { !it.isNullOrBlank() }
+
     defaultConfig {
         applicationId = "com.tiktokcare.app"
         minSdk = 21
@@ -24,9 +35,23 @@ android {
         buildConfigField("String", "FEED_URL", "\"$feedUrl\"")
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
