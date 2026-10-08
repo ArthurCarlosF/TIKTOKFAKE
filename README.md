@@ -55,3 +55,5 @@ Download/TikTokCare
 ```
 
 Se encontrar arquivos de video nessas pastas, ele monta o feed local. Se nao encontrar, tenta carregar o feed remoto.
+
+Tambem ha um botao `Importar` dentro do app. Ele abre a galeria/seletor de arquivos do Android, copia os videos escolhidos para o armazenamento interno do app e atualiza o feed automaticamente.

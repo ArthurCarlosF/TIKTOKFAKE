@@ -3,6 +3,7 @@ package com.tiktokcare.app
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
@@ -25,6 +26,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
@@ -42,6 +44,7 @@ class MainActivity : Activity() {
     private lateinit var metaText: TextView
     private lateinit var statusText: TextView
     private lateinit var retryButton: TextView
+    private lateinit var importButton: TextView
     private lateinit var likeButton: TextView
     private lateinit var nextButton: TextView
     private lateinit var previousButton: TextView
@@ -209,6 +212,22 @@ class MainActivity : Activity() {
         }
         root.addView(retryButton)
 
+        importButton = TextView(this).apply {
+            text = getString(R.string.import_videos)
+            setTextColor(Color.BLACK)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setBackgroundColor(Color.WHITE)
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            layoutParams = FrameLayout.LayoutParams(wrap(), wrap(), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(68)
+                rightMargin = dp(14)
+            }
+            setOnClickListener { openVideoImporter() }
+        }
+        root.addView(importButton)
+
         nextButton.setOnClickListener { showNext() }
         previousButton.setOnClickListener { showPrevious() }
         likeButton.setOnClickListener { likeButton.isSelected = !likeButton.isSelected }
@@ -295,7 +314,49 @@ class MainActivity : Activity() {
                     currentIndex = 0
                     playCurrent()
                 } else {
-                    loadFeed()
+                    showMessage(getString(R.string.local_feed_empty), true)
+                }
+            }
+        }
+    }
+
+    private fun openVideoImporter() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "video/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        startActivityForResult(intent, REQUEST_IMPORT_VIDEOS)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_IMPORT_VIDEOS || resultCode != RESULT_OK || data == null) return
+
+        val uris = mutableListOf<Uri>()
+        data.clipData?.let { clip ->
+            for (index in 0 until clip.itemCount) {
+                uris += clip.getItemAt(index).uri
+            }
+        }
+        data.data?.let { uris += it }
+
+        if (uris.isEmpty()) return
+
+        showLoading()
+        thread(name = "video-importer") {
+            val imported = uris.mapNotNull { uri ->
+                runCatching { copyImportedVideo(uri) }.getOrNull()
+            }
+            runOnUiThread {
+                if (imported.isNotEmpty()) {
+                    videos = queryImportedVideos()
+                    currentIndex = 0
+                    playCurrent()
+                } else {
+                    showMessage(getString(R.string.import_failed), true)
                 }
             }
         }
@@ -333,6 +394,9 @@ class MainActivity : Activity() {
     }
 
     private fun queryLocalVideos(): List<CareVideo> {
+        val imported = queryImportedVideos()
+        if (imported.isNotEmpty()) return imported
+
         val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Video.Media._ID,
@@ -378,6 +442,44 @@ class MainActivity : Activity() {
         }
 
         return items
+    }
+
+    private fun queryImportedVideos(): List<CareVideo> {
+        val directory = importedVideoDirectory()
+        val files = directory
+            .listFiles { file -> file.isFile && file.extension.lowercase() in VIDEO_EXTENSIONS }
+            .orEmpty()
+            .sortedByDescending { it.lastModified() }
+
+        return files.mapIndexed { index, file ->
+            CareVideo(
+                id = "imported-${file.nameWithoutExtension}",
+                title = file.nameWithoutExtension.ifBlank { "Video importado" },
+                videoUrl = Uri.fromFile(file).toString(),
+                youtubeId = "",
+                category = "Local",
+                sourceLabel = "Importado da galeria",
+                caregiverNote = "",
+                order = index
+            )
+        }
+    }
+
+    private fun copyImportedVideo(uri: Uri): File {
+        val directory = importedVideoDirectory().apply { mkdirs() }
+        val extension = contentResolver.getType(uri)?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "mp4"
+        val file = File(directory, "video-${System.currentTimeMillis()}-${uri.hashCode()}.$extension")
+
+        contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Unable to open imported video" }
+            file.outputStream().use { output -> input.copyTo(output) }
+        }
+
+        return file
+    }
+
+    private fun importedVideoDirectory(): File {
+        return File(filesDir, "imported-videos")
     }
 
     private fun fetchFeedJson(feedUrl: String): String {
@@ -589,5 +691,7 @@ class MainActivity : Activity() {
     companion object {
         private const val CACHE_KEY_FEED_JSON = "feed_json"
         private const val REQUEST_VIDEO_PERMISSION = 101
+        private const val REQUEST_IMPORT_VIDEOS = 102
+        private val VIDEO_EXTENSIONS = setOf("mp4", "mov", "m4v", "webm", "mkv")
     }
 }

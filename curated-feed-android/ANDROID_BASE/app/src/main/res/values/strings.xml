@@ -3,5 +3,7 @@
     <string name="feed_empty">Nenhum video ativo no feed.</string>
     <string name="feed_error">Nao foi possivel carregar o feed.</string>
     <string name="local_feed_empty">Coloque videos em Movies/TikTokCare ou Download/TikTokCare.</string>
+    <string name="import_videos">Importar</string>
+    <string name="import_failed">Nao foi possivel importar o video.</string>
     <string name="retry">Tentar novamente</string>
 </resources>
